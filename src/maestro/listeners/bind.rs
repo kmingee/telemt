@@ -308,7 +308,7 @@ pub(crate) async fn bind_listeners(
                     if let Err(error_value) = fchmodat(
                         anchored_path.parent(),
                         anchored_path.name(),
-                        Mode::from_bits_truncate(mode),
+                        Mode::from_bits_truncate(mode as libc::mode_t),
                         FchmodatFlags::NoFollowSymlink,
                     ) {
                         error!(
