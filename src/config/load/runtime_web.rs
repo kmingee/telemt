@@ -24,7 +24,7 @@ use sha2::{Digest, Sha256};
 
 use super::*;
 #[cfg(unix)]
-use crate::util::secure_fs::open_dir_nofollow;
+use crate::util::secure_fs::open_dir_readable_nofollow;
 
 // Path-based static snapshot fallback for platforms without directory descriptors.
 #[cfg(not(unix))]
@@ -148,7 +148,7 @@ fn load_static_site(
 
 #[cfg(unix)]
 fn open_static_root(root: &Path) -> Result<Dir> {
-    let descriptor = open_dir_nofollow(root).map_err(|error| {
+    let descriptor = open_dir_readable_nofollow(root).map_err(|error| {
         ProxyError::Config(format!(
             "WEB static directory `{}` must be a real directory, not a symlink: {error}",
             root.display()

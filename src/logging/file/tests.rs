@@ -178,6 +178,59 @@ fn max_files_retention_removes_oldest_archives() {
 
 #[cfg(unix)]
 #[test]
+fn log_cleanup_can_enumerate_archives_in_both_path_modes() {
+    for strict_runtime_paths in [false, true] {
+        let dir = tempdir().unwrap();
+        let path = dir.path().join("telemt.log");
+        let archive = dir.path().join("telemt.log.old");
+        fs::write(&archive, b"old").unwrap();
+
+        let appender = BoundedFileAppender::with_now(
+            options(path.clone()),
+            Box::new(fixed_now),
+            strict_runtime_paths,
+        )
+        .unwrap();
+        let candidates = appender.collect_candidates().unwrap();
+
+        assert!(candidates.iter().any(|candidate| candidate.path == path));
+        assert!(candidates.iter().any(|candidate| candidate.path == archive));
+    }
+}
+
+#[cfg(unix)]
+#[test]
+fn log_cleanup_enumeration_stays_anchored_after_path_replacement() {
+    use std::os::unix::fs::symlink;
+
+    let dir = tempdir().unwrap();
+    let original = dir.path().join("logs");
+    let moved = dir.path().join("logs-moved");
+    let redirect = dir.path().join("redirect");
+    fs::create_dir(&original).unwrap();
+    fs::create_dir(&redirect).unwrap();
+    let appender = BoundedFileAppender::with_now(
+        options(original.join("telemt.log")),
+        Box::new(fixed_now),
+        false,
+    )
+    .unwrap();
+    fs::write(original.join("telemt.log.saved"), b"real archive").unwrap();
+    fs::rename(&original, &moved).unwrap();
+    symlink(&redirect, &original).unwrap();
+    fs::write(redirect.join("telemt.log.decoy"), b"redirected archive").unwrap();
+
+    let candidates = appender.collect_candidates().unwrap();
+    let names: Vec<_> = candidates
+        .iter()
+        .filter_map(|candidate| candidate.path.file_name())
+        .collect();
+    assert!(names.contains(&std::ffi::OsStr::new("telemt.log.saved")));
+    assert!(!names.contains(&std::ffi::OsStr::new("telemt.log.decoy")));
+}
+
+#[cfg(unix)]
+#[test]
 fn max_age_retention_removes_old_archives() {
     use std::ffi::CString;
     use std::os::unix::ffi::OsStrExt;

@@ -90,3 +90,36 @@ fn static_snapshot_remains_anchored_after_root_path_replacement() {
 
     assert_eq!(assets["/index.html"].body.as_ref(), b"original");
 }
+
+#[cfg(target_os = "freebsd")]
+#[test]
+fn static_snapshot_reads_files_below_search_only_parent() {
+    use std::os::unix::fs::PermissionsExt;
+
+    if nix::unistd::Uid::effective().is_root() {
+        return;
+    }
+
+    let temp = tempfile::tempdir().unwrap();
+    let parent = temp.path().join("search-only");
+    let site = parent.join("decoy");
+    fs::create_dir_all(site.join("assets")).unwrap();
+    fs::write(site.join("index.html"), b"index").unwrap();
+    fs::write(site.join("assets/site.css"), b"body{}").unwrap();
+    fs::set_permissions(&parent, fs::Permissions::from_mode(0o100)).unwrap();
+
+    let mut total_files = 0;
+    let mut total_bytes = 0;
+    let result = load_static_site(
+        &site,
+        "index.html",
+        &WebLimitsConfig::default(),
+        &mut total_files,
+        &mut total_bytes,
+    );
+
+    fs::set_permissions(&parent, fs::Permissions::from_mode(0o700)).unwrap();
+    let loaded = result.unwrap();
+    assert_eq!(loaded.assets["/index.html"].body.as_ref(), b"index");
+    assert_eq!(loaded.assets["/assets/site.css"].body.as_ref(), b"body{}");
+}

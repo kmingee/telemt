@@ -9,7 +9,7 @@ mod write;
 
 pub(crate) use path::{
     AnchoredPath, chdir_nofollow_or_create, open_compatible_dir, open_dir_nofollow,
-    open_trusted_dir_nofollow_or_create,
+    open_dir_readable_nofollow, open_trusted_dir_nofollow_or_create,
 };
 #[cfg(test)]
 pub(crate) use write::open_append_regular;

@@ -14,6 +14,27 @@ fn directory_walk_rejects_intermediate_symlink() {
     symlink(&real, &link).unwrap();
 
     assert!(open_dir_nofollow(&link).is_err());
+    assert!(open_dir_readable_nofollow(&link).is_err());
+}
+
+#[test]
+fn readable_directory_descriptor_supports_enumeration() {
+    let directory = tempfile::tempdir().unwrap();
+    std::fs::write(directory.path().join("index.html"), b"ready").unwrap();
+
+    let descriptor = open_dir_readable_nofollow(directory.path()).unwrap();
+    let mut directory = nix::dir::Dir::from_fd(descriptor).unwrap();
+    assert!(
+        directory
+            .iter()
+            .any(|entry| entry.unwrap().file_name().to_bytes() == b"index.html")
+    );
+
+    // Empty component walks must also return a descriptor that can be read.
+    for path in [Path::new("/"), Path::new(".")] {
+        let descriptor = open_dir_readable_nofollow(path).unwrap();
+        assert!(nix::dir::Dir::from_fd(descriptor).is_ok());
+    }
 }
 
 #[cfg(target_os = "freebsd")]
@@ -44,6 +65,29 @@ fn directory_walk_accepts_search_only_parent_on_freebsd() {
     // Restore access before asserting, so TempDir can clean up on failure too.
     std::fs::set_permissions(&search_only, std::fs::Permissions::from_mode(0o700)).unwrap();
     assert!(result.is_ok(), "{result:?}");
+}
+
+#[cfg(target_os = "freebsd")]
+#[test]
+fn readable_directory_walk_accepts_search_only_parent_on_freebsd() {
+    if nix::unistd::Uid::effective().is_root() {
+        return;
+    }
+
+    let directory = tempfile::tempdir().unwrap();
+    let search_only = directory.path().join("search-only");
+    let leaf = search_only.join("site");
+    std::fs::create_dir_all(&leaf).unwrap();
+    std::fs::write(leaf.join("index.html"), b"ready").unwrap();
+    std::fs::set_permissions(&search_only, std::fs::Permissions::from_mode(0o100)).unwrap();
+
+    let result = open_dir_readable_nofollow(&leaf).and_then(|descriptor| {
+        nix::dir::Dir::from_fd(descriptor)
+            .map_err(|error| std::io::Error::from_raw_os_error(error as i32))
+    });
+
+    std::fs::set_permissions(&search_only, std::fs::Permissions::from_mode(0o700)).unwrap();
+    result.unwrap();
 }
 
 #[test]
