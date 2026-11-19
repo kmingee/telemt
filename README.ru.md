@@ -2,6 +2,8 @@
 
 [![Latest Release](https://img.shields.io/github/v/release/telemt/telemt?color=neon)](https://github.com/telemt/telemt/releases/latest) [![Stars](https://img.shields.io/github/stars/telemt/telemt?style=social)](https://github.com/telemt/telemt/stargazers) [![Forks](https://img.shields.io/github/forks/telemt/telemt?style=social)](https://github.com/telemt/telemt/network/members)
 
+[🇬🇧 English](README.md) · [🇷🇺 Русский](README.ru.md) · [🇨🇳 简体中文](README.zh-CN.md)
+
 > [!NOTE]
 >
 > Клиенты Telegram подвергаются блокировке по JA3-отпечатку; мы ищем варианты решения этой проблемы

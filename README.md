@@ -2,7 +2,7 @@
 
 [![Latest Release](https://img.shields.io/github/v/release/kmingee/telemt?color=neon)](https://github.com/kmingee/telemt/releases/latest) [![Stars](https://img.shields.io/github/stars/telemt/telemt?style=social)](https://github.com/telemt/telemt/stargazers) [![Forks](https://img.shields.io/github/forks/telemt/telemt?style=social)](https://github.com/telemt/telemt/network/members)
 
-[🇷🇺 README на русском](https://github.com/telemt/telemt/blob/main/README.ru.md)
+[🇬🇧 English](README.md) · [🇷🇺 Русский](README.ru.md) · [🇨🇳 简体中文](README.zh-CN.md)
 
 > [!NOTE]
 >
