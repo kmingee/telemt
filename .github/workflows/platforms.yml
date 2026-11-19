@@ -1,0 +1,38 @@
+name: Non-Linux builds
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ "*" ]
+
+permissions:
+  contents: read
+
+jobs:
+  windows:
+    name: Windows x86_64 build
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+      - run: cargo build --release --locked --target x86_64-pc-windows-msvc
+
+  freebsd:
+    name: FreeBSD x86_64 build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - name: Build in FreeBSD VM
+        uses: vmactions/freebsd-vm@v1
+        with:
+          release: '14.3'
+          arch: x86_64
+          prepare: |
+            pkg install -y rust ca_root_nss
+          run: |
+            set -eu
+            export CARGO_BUILD_JOBS=2
+            cargo build --release --locked
