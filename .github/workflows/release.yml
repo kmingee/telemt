@@ -308,12 +308,97 @@ jobs:
           path: dist/*
 
   # ==========================
+  # FreeBSD (native FreeBSD VM)
+  # ==========================
+  build-freebsd:
+    name: FreeBSD x86_64
+    runs-on: ubuntu-latest
+    needs: prepare
+
+    steps:
+      - uses: actions/checkout@v7.0.1
+
+      - name: Build and package on FreeBSD
+        uses: vmactions/freebsd-vm@v1
+        with:
+          release: '14.3'
+          arch: x86_64
+          prepare: |
+            pkg install -y rust ca_root_nss
+          run: |
+            set -eu
+            export CARGO_BUILD_JOBS=2
+            cargo build --release --locked
+
+            mkdir -p dist
+            cp target/release/telemt dist/telemt
+            strip dist/telemt
+            tar -czf dist/telemt-x86_64-freebsd.tar.gz -C dist telemt
+
+            cd dist
+            sha256 -r telemt-x86_64-freebsd.tar.gz > telemt-x86_64-freebsd.tar.gz.sha256
+
+      - uses: actions/upload-artifact@v7.0.1
+        with:
+          name: telemt-x86_64-freebsd
+          path: |
+            dist/telemt-x86_64-freebsd.tar.gz
+            dist/telemt-x86_64-freebsd.tar.gz.sha256
+          if-no-files-found: error
+
+  # ==========================
+  # Windows (native MSVC build)
+  # ==========================
+  build-windows:
+    name: Windows x86_64
+    runs-on: windows-latest
+    needs: prepare
+
+    steps:
+      - uses: actions/checkout@v7.0.1
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+
+      - uses: actions/cache@v6.1.0
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: windows-x86_64-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            windows-x86_64-
+
+      - name: Build
+        run: cargo build --release --locked --target x86_64-pc-windows-msvc
+
+      - name: Package
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force dist | Out-Null
+          Copy-Item target/x86_64-pc-windows-msvc/release/telemt.exe dist/telemt.exe
+          $asset = 'telemt-x86_64-windows.zip'
+          Compress-Archive -Path dist/telemt.exe -DestinationPath "dist/$asset"
+          $hash = (Get-FileHash -Path "dist/$asset" -Algorithm SHA256).Hash.ToLowerInvariant()
+          Set-Content -Path "dist/$asset.sha256" -Value "$hash  $asset" -Encoding ascii
+
+      - uses: actions/upload-artifact@v7.0.1
+        with:
+          name: telemt-x86_64-windows
+          path: |
+            dist/telemt-x86_64-windows.zip
+            dist/telemt-x86_64-windows.zip.sha256
+          if-no-files-found: error
+
+  # ==========================
   # Release
   # ==========================
   release:
     name: Release
     runs-on: ubuntu-latest
-    needs: [prepare, build-gnu, build-musl]
+    needs: [prepare, build-gnu, build-musl, build-freebsd, build-windows]
 
     permissions:
       contents: write

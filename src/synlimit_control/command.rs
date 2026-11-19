@@ -1,10 +1,15 @@
+#[cfg(unix)]
 use tokio::io::AsyncWriteExt;
+#[cfg(unix)]
 use tokio::process::Command;
 
+#[cfg(unix)]
 use crate::util::trusted_command::trusted_helper_command;
 
+#[cfg(unix)]
 const COMMAND_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(30);
 
+#[cfg(unix)]
 pub(super) async fn run_command(
     binary: &str,
     args: &[&str],
@@ -51,6 +56,16 @@ pub(super) async fn run_command(
     })
 }
 
+#[cfg(not(unix))]
+pub(super) async fn run_command(
+    binary: &str,
+    _args: &[&str],
+    _stdin: Option<String>,
+) -> Result<(), String> {
+    Err(format!("{binary} is not available"))
+}
+
+#[cfg(unix)]
 pub(super) async fn run_command_stdout(binary: &str, args: &[&str]) -> Result<String, String> {
     let Some(command) = trusted_helper_command(binary) else {
         return Err(format!("{binary} is not available"));
@@ -70,6 +85,11 @@ pub(super) async fn run_command_stdout(binary: &str, args: &[&str]) -> Result<St
     } else {
         stderr
     })
+}
+
+#[cfg(not(unix))]
+pub(super) async fn run_command_stdout(binary: &str, _args: &[&str]) -> Result<String, String> {
+    Err(format!("{binary} is not available"))
 }
 
 pub(super) fn has_firewall_privileges() -> bool {
