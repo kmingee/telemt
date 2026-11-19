@@ -206,8 +206,7 @@ fn open_dir_components(
                     Ok(()) | Err(nix::errno::Errno::EEXIST) => {}
                     Err(error) => return Err(errno_to_io(error)),
                 }
-                openat(&current, name.as_os_str(), flags, Mode::empty())
-                    .map_err(errno_to_io)?
+                openat(&current, name.as_os_str(), flags, Mode::empty()).map_err(errno_to_io)?
             }
             Err(error) => return Err(errno_to_io(error)),
         };
