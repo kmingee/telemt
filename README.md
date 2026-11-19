@@ -1,6 +1,6 @@
 # Telemt - MTProxy on Rust + Tokio
 
-[![Latest Release](https://img.shields.io/github/v/release/telemt/telemt?color=neon)](https://github.com/telemt/telemt/releases/latest) [![Stars](https://img.shields.io/github/stars/telemt/telemt?style=social)](https://github.com/telemt/telemt/stargazers) [![Forks](https://img.shields.io/github/forks/telemt/telemt?style=social)](https://github.com/telemt/telemt/network/members)
+[![Latest Release](https://img.shields.io/github/v/release/kmingee/telemt?color=neon)](https://github.com/kmingee/telemt/releases/latest) [![Stars](https://img.shields.io/github/stars/telemt/telemt?style=social)](https://github.com/telemt/telemt/stargazers) [![Forks](https://img.shields.io/github/forks/telemt/telemt?style=social)](https://github.com/telemt/telemt/network/members)
 
 [🇷🇺 README на русском](https://github.com/telemt/telemt/blob/main/README.ru.md)
 
@@ -52,6 +52,18 @@ Our ***Middle-End Pool*** is fastest by design in standard scenarios, compared t
 - [Why Rust?](#why-rust)
 
 ## Build
+
+Prebuilt binaries for this fork are available on the [Releases page](https://github.com/kmingee/telemt/releases):
+
+- FreeBSD x86_64: `telemt-x86_64-freebsd.tar.gz` (built on FreeBSD 14.3).
+- Windows x86_64: `telemt-x86_64-windows.zip` (contains `telemt.exe`).
+- Linux: existing GNU and MUSL archives remain available.
+
+Each archive has a corresponding `.sha256` checksum file. Extract the archive and run
+`telemt config.toml` (or `telemt.exe config.toml` on Windows) from a directory
+containing your configuration. Windows runs in the foreground; Unix-specific
+daemon and service-management commands are unavailable there.
+
 ```bash
 # Cloning repo
 git clone https://github.com/telemt/telemt 

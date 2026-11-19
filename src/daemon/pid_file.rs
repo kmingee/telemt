@@ -250,7 +250,7 @@ fn open_file_at(anchor: &AnchoredPath, name: &OsStr, flags: OFlag, mode: u32) ->
         flags,
         Mode::from_bits_truncate(mode as libc::mode_t),
     )
-        .map_err(|error| io::Error::from_raw_os_error(error as i32))?;
+    .map_err(|error| io::Error::from_raw_os_error(error as i32))?;
     Ok(File::from(descriptor))
 }
 
