@@ -16,6 +16,36 @@ fn directory_walk_rejects_intermediate_symlink() {
     assert!(open_dir_nofollow(&link).is_err());
 }
 
+#[cfg(target_os = "freebsd")]
+#[test]
+fn directory_descriptors_use_search_access_on_freebsd() {
+    let directory = tempfile::tempdir().unwrap();
+    let descriptor = open_dir_nofollow(directory.path()).unwrap();
+    let flags = nix::fcntl::fcntl(&descriptor, nix::fcntl::FcntlArg::F_GETFL).unwrap();
+
+    assert_ne!(flags & libc::O_SEARCH, 0);
+}
+
+#[cfg(target_os = "freebsd")]
+#[test]
+fn directory_walk_accepts_search_only_parent_on_freebsd() {
+    if nix::unistd::Uid::effective().is_root() {
+        return;
+    }
+
+    let directory = tempfile::tempdir().unwrap();
+    let search_only = directory.path().join("search-only");
+    let nested = search_only.join("nested");
+    std::fs::create_dir_all(&nested).unwrap();
+    std::fs::set_permissions(&search_only, std::fs::Permissions::from_mode(0o100)).unwrap();
+
+    let result = open_dir_nofollow(&nested);
+
+    // Restore access before asserting, so TempDir can clean up on failure too.
+    std::fs::set_permissions(&search_only, std::fs::Permissions::from_mode(0o700)).unwrap();
+    assert!(result.is_ok(), "{result:?}");
+}
+
 #[test]
 fn runtime_parent_policy_creates_and_reads_relative_paths() {
     use std::os::unix::fs::MetadataExt;

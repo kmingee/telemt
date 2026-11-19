@@ -7,7 +7,14 @@ use std::path::{Component, Path};
 use nix::fcntl::{OFlag, open, openat};
 use nix::sys::stat::{Mode, mkdirat};
 
-const DIRECTORY_FLAGS: OFlag = OFlag::O_RDONLY
+// FreeBSD may allow searching a parent directory without allowing it to be read.
+// Opening each component with O_RDONLY would reject otherwise accessible paths.
+#[cfg(target_os = "freebsd")]
+const DIRECTORY_ACCESS_FLAGS: OFlag = OFlag::O_SEARCH;
+#[cfg(not(target_os = "freebsd"))]
+const DIRECTORY_ACCESS_FLAGS: OFlag = OFlag::O_RDONLY;
+
+const DIRECTORY_FLAGS: OFlag = DIRECTORY_ACCESS_FLAGS
     .union(OFlag::O_DIRECTORY)
     .union(OFlag::O_NOFOLLOW)
     .union(OFlag::O_CLOEXEC);
