@@ -378,7 +378,11 @@ pub fn spawn_config_watcher(
         let tx_inotify = notify_tx.clone();
         let manifest_for_inotify = manifest_state.clone();
         let mut inotify_watcher =
-            match recommended_watcher(move |res: notify::Result<notify::Event>| {
+            if cfg!(target_os = "freebsd") {
+                // notify kqueue holds an FD per watched file on FreeBSD.
+                None
+            } else {
+                match recommended_watcher(move |res: notify::Result<notify::Event>| {
                 let Ok(event) = res else { return };
                 if !matches!(
                     event.kind,
@@ -399,16 +403,8 @@ pub fn spawn_config_watcher(
                     warn!("config watcher: inotify unavailable: {}", e);
                     None
                 }
+            }
             };
-        apply_watch_manifest(
-            inotify_watcher.as_mut(),
-            Option::<&mut notify::poll::PollWatcher>::None,
-            &manifest_state,
-            initial_manifest.clone(),
-        );
-        if inotify_watcher.is_some() {
-            info!("config watcher: inotify active on {:?}", config_path);
-        }
 
         let tx_poll = notify_tx.clone();
         let manifest_for_poll = manifest_state.clone();
@@ -439,14 +435,19 @@ pub fn spawn_config_watcher(
                 None
             }
         };
+        // Register both watcher backends before publishing the manifest. Previously
+        // the native watcher published it first, causing polling to skip registration.
         apply_watch_manifest(
-            Option::<&mut notify::RecommendedWatcher>::None,
+            inotify_watcher.as_mut(),
             poll_watcher.as_mut(),
             &manifest_state,
             initial_manifest.clone(),
         );
+        if inotify_watcher.is_some() {
+            info!("config watcher: native notifications active on {:?}", config_path);
+        }
         if poll_watcher.is_some() {
-            info!("config watcher: poll watcher active (Docker/NFS safe)");
+            info!("config watcher: poll watcher active (FreeBSD/Docker/NFS safe)");
         }
         if initial_loaded.is_some()
             && (!initial_matches_disk
