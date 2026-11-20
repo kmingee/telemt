@@ -1,5 +1,6 @@
 //! Hot-reload: watches the config file via inotify (Linux) / FSEvents (macOS)
 //! / ReadDirectoryChangesW (Windows) using the `notify` crate.
+//! FreeBSD uses polling instead of kqueue to avoid retaining FDs for unrelated files.
 //! SIGHUP is also supported on Unix as an additional manual trigger.
 //!
 //! # What can be reloaded without restart
@@ -32,7 +33,9 @@ use std::path::{Path, PathBuf};
 use std::sync::{Arc, RwLock as StdRwLock};
 use std::time::Duration;
 
-use notify::{EventKind, RecursiveMode, Watcher, recommended_watcher};
+use notify::{EventKind, RecursiveMode, Watcher};
+#[cfg(not(target_os = "freebsd"))]
+use notify::recommended_watcher;
 use tokio::sync::{mpsc, watch};
 use tracing::{error, info, warn};
 

@@ -294,7 +294,8 @@ pub(super) fn reload_config(
 
 /// Spawn the hot-reload watcher task.
 ///
-/// Uses `notify` (inotify on Linux) to detect file changes instantly.
+/// Uses native file notifications (inotify on Linux) and polling for config changes.
+/// On FreeBSD, only polling is used to avoid kqueue vnode watch FD growth.
 /// SIGHUP is also handled on Unix as an additional manual trigger.
 ///
 /// `detected_ip_v4` / `detected_ip_v6` are the IPs discovered during the
@@ -375,8 +376,16 @@ pub fn spawn_config_watcher(
         let manifest_state = Arc::new(StdRwLock::new(WatchManifest::default()));
         let mut reload_state = ReloadState::new(initial_snapshot_hash);
 
+        // notify's FreeBSD kqueue backend may add vnode watches for unrelated
+        // files when a watched directory changes. Each watch keeps an open FD,
+        // so a busy runtime directory can exhaust a small RLIMIT_NOFILE.
+        #[cfg(target_os = "freebsd")]
+        let mut inotify_watcher: Option<notify::RecommendedWatcher> = None;
+        #[cfg(not(target_os = "freebsd"))]
         let tx_inotify = notify_tx.clone();
+        #[cfg(not(target_os = "freebsd"))]
         let manifest_for_inotify = manifest_state.clone();
+        #[cfg(not(target_os = "freebsd"))]
         let mut inotify_watcher =
             match recommended_watcher(move |res: notify::Result<notify::Event>| {
                 let Ok(event) = res else { return };
@@ -400,14 +409,8 @@ pub fn spawn_config_watcher(
                     None
                 }
             };
-        apply_watch_manifest(
-            inotify_watcher.as_mut(),
-            Option::<&mut notify::poll::PollWatcher>::None,
-            &manifest_state,
-            initial_manifest.clone(),
-        );
         if inotify_watcher.is_some() {
-            info!("config watcher: inotify active on {:?}", config_path);
+            info!("config watcher: native file notifications active on {:?}", config_path);
         }
 
         let tx_poll = notify_tx.clone();
@@ -440,13 +443,13 @@ pub fn spawn_config_watcher(
             }
         };
         apply_watch_manifest(
-            Option::<&mut notify::RecommendedWatcher>::None,
+            inotify_watcher.as_mut(),
             poll_watcher.as_mut(),
             &manifest_state,
             initial_manifest.clone(),
         );
         if poll_watcher.is_some() {
-            info!("config watcher: poll watcher active (Docker/NFS safe)");
+            info!("config watcher: poll watcher active (3s interval)");
         }
         if initial_loaded.is_some()
             && (!initial_matches_disk
@@ -556,6 +559,9 @@ mod decoy_dns_tests;
 
 #[cfg(test)]
 mod quota_period_tests;
+
+#[cfg(test)]
+mod tests;
 
 #[cfg(test)]
 mod observation_tests;

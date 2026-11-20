@@ -36,3 +36,4 @@ jobs:
             set -eu
             export CARGO_BUILD_JOBS=2
             cargo build --release --locked
+            cargo test --locked freebsd_config_watcher_polls_for_config_updates
