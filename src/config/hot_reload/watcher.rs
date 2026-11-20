@@ -377,12 +377,11 @@ pub fn spawn_config_watcher(
 
         let tx_inotify = notify_tx.clone();
         let manifest_for_inotify = manifest_state.clone();
-        let mut inotify_watcher =
-            if cfg!(target_os = "freebsd") {
-                // notify kqueue holds an FD per watched file on FreeBSD.
-                None
-            } else {
-                match recommended_watcher(move |res: notify::Result<notify::Event>| {
+        let mut inotify_watcher = if cfg!(target_os = "freebsd") {
+            // The kqueue backend retains a descriptor for each discovered file.
+            None
+        } else {
+            match recommended_watcher(move |res: notify::Result<notify::Event>| {
                 let Ok(event) = res else { return };
                 if !matches!(
                     event.kind,
@@ -400,11 +399,11 @@ pub fn spawn_config_watcher(
             }) {
                 Ok(watcher) => Some(watcher),
                 Err(e) => {
-                    warn!("config watcher: inotify unavailable: {}", e);
+                    warn!("config watcher: native watcher unavailable: {}", e);
                     None
                 }
             }
-            };
+        };
 
         let tx_poll = notify_tx.clone();
         let manifest_for_poll = manifest_state.clone();
