@@ -36,3 +36,7 @@ jobs:
             set -eu
             export CARGO_BUILD_JOBS=2
             cargo build --release --locked
+            cargo test --locked readable_directory
+            cargo test --locked search_only_parent
+            cargo test --locked static_snapshot
+            cargo test --locked log_cleanup

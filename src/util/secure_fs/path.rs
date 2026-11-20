@@ -18,6 +18,10 @@ const DIRECTORY_FLAGS: OFlag = DIRECTORY_ACCESS_FLAGS
     .union(OFlag::O_DIRECTORY)
     .union(OFlag::O_NOFOLLOW)
     .union(OFlag::O_CLOEXEC);
+const READABLE_DIRECTORY_FLAGS: OFlag = OFlag::O_RDONLY
+    .union(OFlag::O_DIRECTORY)
+    .union(OFlag::O_NOFOLLOW)
+    .union(OFlag::O_CLOEXEC);
 
 /// An immutable parent-directory descriptor paired with one final path component.
 pub(crate) struct AnchoredPath {
@@ -109,11 +113,16 @@ impl AnchoredPath {
 
 /// Opens a directory by walking every component with `O_NOFOLLOW`.
 pub(crate) fn open_dir_nofollow(path: &Path) -> io::Result<OwnedFd> {
-    open_dir_components(path, None, false)
+    open_dir_components(path, None, false, DIRECTORY_FLAGS)
+}
+
+/// Opens the final directory for enumeration while only searching its ancestors.
+pub(crate) fn open_dir_readable_nofollow(path: &Path) -> io::Result<OwnedFd> {
+    open_dir_components(path, None, false, READABLE_DIRECTORY_FLAGS)
 }
 
 fn open_or_create_dir_nofollow(path: &Path, mode: u32) -> io::Result<OwnedFd> {
-    open_dir_components(path, Some(mode), false)
+    open_dir_components(path, Some(mode), false, DIRECTORY_FLAGS)
 }
 
 /// Opens a directory after securely creating any missing components.
@@ -123,7 +132,7 @@ pub(crate) fn open_dir_nofollow_or_create(path: &Path, mode: u32) -> io::Result<
 
 /// Opens or creates a directory chain protected from untrusted entry replacement.
 pub(crate) fn open_trusted_dir_nofollow_or_create(path: &Path, mode: u32) -> io::Result<OwnedFd> {
-    open_dir_components(path, Some(mode), true)
+    open_dir_components(path, Some(mode), true, DIRECTORY_FLAGS)
 }
 
 /// Follows parent-directory symlinks without imposing ownership or permission policy.
@@ -145,13 +154,14 @@ pub(crate) fn open_compatible_dir(path: &Path, create_mode: Option<u32>) -> io::
 
 /// Opens a directory only when its entire path is owned by root or the effective user.
 fn open_trusted_dir_nofollow(path: &Path) -> io::Result<OwnedFd> {
-    open_dir_components(path, None, true)
+    open_dir_components(path, None, true, DIRECTORY_FLAGS)
 }
 
 fn open_dir_components(
     path: &Path,
     create_mode: Option<u32>,
     require_trusted: bool,
+    final_flags: OFlag,
 ) -> io::Result<OwnedFd> {
     let mut names = Vec::new();
     for component in path.components() {
@@ -172,13 +182,23 @@ fn open_dir_components(
     } else {
         Path::new(".")
     };
-    let mut current = open(start, DIRECTORY_FLAGS, Mode::empty()).map_err(errno_to_io)?;
+    let start_flags = if names.is_empty() {
+        final_flags
+    } else {
+        DIRECTORY_FLAGS
+    };
+    let mut current = open(start, start_flags, Mode::empty()).map_err(errno_to_io)?;
     if require_trusted {
         validate_trusted_directory(&current, !names.is_empty())?;
     }
     let component_count = names.len();
     for (index, name) in names.into_iter().enumerate() {
-        let next = match openat(&current, name.as_os_str(), DIRECTORY_FLAGS, Mode::empty()) {
+        let flags = if index + 1 == component_count {
+            final_flags
+        } else {
+            DIRECTORY_FLAGS
+        };
+        let next = match openat(&current, name.as_os_str(), flags, Mode::empty()) {
             Ok(descriptor) => descriptor,
             Err(nix::errno::Errno::ENOENT) if create_mode.is_some() => {
                 let mode = Mode::from_bits_truncate(create_mode.unwrap_or(0o750) as libc::mode_t);
@@ -186,8 +206,7 @@ fn open_dir_components(
                     Ok(()) | Err(nix::errno::Errno::EEXIST) => {}
                     Err(error) => return Err(errno_to_io(error)),
                 }
-                openat(&current, name.as_os_str(), DIRECTORY_FLAGS, Mode::empty())
-                    .map_err(errno_to_io)?
+                openat(&current, name.as_os_str(), flags, Mode::empty()).map_err(errno_to_io)?
             }
             Err(error) => return Err(errno_to_io(error)),
         };

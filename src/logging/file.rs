@@ -21,7 +21,7 @@ use nix::fcntl::{OFlag, openat, renameat};
 #[cfg(unix)]
 use nix::sys::stat::Mode;
 #[cfg(unix)]
-use nix::unistd::{UnlinkatFlags, dup, unlinkat};
+use nix::unistd::{UnlinkatFlags, unlinkat};
 
 use chrono::{DateTime, Datelike, Duration as ChronoDuration, Utc};
 
@@ -252,8 +252,15 @@ impl BoundedFileAppender {
     fn collect_candidates(&self) -> io::Result<Vec<LogFileCandidate>> {
         use std::os::unix::fs::MetadataExt;
 
-        let descriptor =
-            dup(&self.dir_fd).map_err(|error| io::Error::from_raw_os_error(error as i32))?;
+        // A search-only directory descriptor can anchor openat(), but fdopendir()
+        // needs a readable descriptor for enumerating archived logs.
+        let descriptor = openat(
+            &self.dir_fd,
+            ".",
+            OFlag::O_RDONLY | OFlag::O_DIRECTORY | OFlag::O_NOFOLLOW | OFlag::O_CLOEXEC,
+            Mode::empty(),
+        )
+        .map_err(|error| io::Error::from_raw_os_error(error as i32))?;
         let mut directory =
             Dir::from_fd(descriptor).map_err(|error| io::Error::from_raw_os_error(error as i32))?;
         let mut candidates = Vec::new();
